@@ -15,6 +15,7 @@ model User {
   image          String?
   username       String?         @unique
   balance        Float           @default(100000)
+  cashBalance    Float           @default(100000)  // Added: Separate cash balance for trading
   influenceScore Float           @default(0)
 
   portfolio      PortfolioItem[]
@@ -73,6 +74,9 @@ model PortfolioItem {
 
   user  User  @relation(fields: [userId], references: [id])
   asset Asset @relation(fields: [assetId], references: [id])
+
+  // Added: Composite unique constraint for upsert operations
+  @@unique([userId, assetId], name: "userId_assetId")
 }
 
 model Trade {
@@ -88,14 +92,17 @@ model Trade {
   buyer User @relation("buyer", fields: [buyerId], references: [id])
   seller User @relation("seller", fields: [sellerId], references: [id])
   asset Asset @relation(fields: [assetId], references: [id])
+
+  // Added: Index for better query performance
+  @@index([assetId, executedAt])
 }
 
 model LimitOrder {
   id         String   @id @default(auto()) @map("_id") @db.ObjectId
   qty        Float
   price      Float
-  side       String
-  status     String   @default("open")
+  side       String   // "buy" or "sell"
+  status     String   @default("open") // "open", "executed", "cancelled"
   createdAt  DateTime @default(now())
   executedAt DateTime?
 
@@ -104,6 +111,10 @@ model LimitOrder {
 
   user  User  @relation(fields: [userId], references: [id])
   asset Asset @relation(fields: [assetId], references: [id])
+
+  // Added: Composite indexes for matching engine performance
+  @@index([status, side, assetId, price, createdAt], name: "matching_index")
+  @@index([assetId, status, qty])
 }
 
 model Kline {
@@ -134,4 +145,32 @@ model Asset {
   trades    Trade[]
   klines    Kline[]
   portfolio PortfolioItem[]
+}
+
+// Added: Matching engine lock table for concurrency control
+model MatchingLock {
+  id         String   @id @map("_id")  // Using string ID instead of ObjectId for simple locking
+  acquiredAt DateTime @default(now())
+  expiresAt  DateTime
+}
+
+// Added: System configuration for matching engine settings
+model SystemConfig {
+  id         String   @id @default(auto()) @map("_id") @db.ObjectId
+  key        String   @unique
+  value      String
+  updatedAt  DateTime @updatedAt @default(now())
+}
+
+// Added: Audit log for tracking all matching engine operations
+model MatchingAuditLog {
+  id          String   @id @default(auto()) @map("_id") @db.ObjectId
+  operation   String   // "match_start", "match_complete", "trade_created", etc.
+  assetId     String?  @db.ObjectId
+  orderId     String?  @db.ObjectId
+  tradeId     String?  @db.ObjectId
+  details     Json?    // Store additional context as JSON
+  executedAt  DateTime @default(now())
+
+  @@index([operation, executedAt])
 }
