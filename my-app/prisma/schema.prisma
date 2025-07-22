@@ -147,9 +147,9 @@ model Asset {
   portfolio PortfolioItem[]
 }
 
-// Added: Matching engine lock table for concurrency control
+
 model MatchingLock {
-  id         String   @id @map("_id")  // Using string ID instead of ObjectId for simple locking
+  id         String   @id @map("_id")  
   acquiredAt DateTime @default(now())
   expiresAt  DateTime
 }
