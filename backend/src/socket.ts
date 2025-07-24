@@ -95,6 +95,8 @@ export function setupSocket(io: Server) {
                 console.error(" Error cancelling order", error);
                 socket.emit("error", { message: "Error cancelling order" });
             }
+
+            
         });
 
         socket.on("disconnect", () => {

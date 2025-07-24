@@ -7,52 +7,116 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-model User {
-  id             String          @id @default(auto()) @map("_id") @db.ObjectId
-  name           String?
-  email          String?         @unique
-  emailVerified  DateTime?
-  image          String?
-  username       String?         @unique
-  balance        Float           @default(100000)
-  cashBalance    Float           @default(100000)  // Added: Separate cash balance for trading
-  influenceScore Float           @default(0)
-
-  portfolio      PortfolioItem[]
-  limitOrders    LimitOrder[]
-  boughtTrades   Trade[]         @relation("buyer")
-  soldTrades     Trade[]         @relation("seller")
-  sessions       Session[]
-  accounts       Account[]
-  createdAt      DateTime        @default(now())
-}
-
 model Account {
-  id                String   @id @default(auto()) @map("_id") @db.ObjectId
-  userId            String   @db.ObjectId
-  type              String
+  id                String @id @default(auto()) @map("_id") @db.ObjectId
+  access_token      String
+  expires_at        BigInt
+  id_token          String
   provider          String
   providerAccountId String
-  refresh_token     String?
-  access_token      String?
-  expires_at        Int?
-  token_type        String?
-  scope             String?
-  id_token          String?
-  session_state     String?
-
-  user User @relation(fields: [userId], references: [id])
+  scope             String
+  token_type        String
+  type              String
+  userId            String @db.ObjectId
 
   @@unique([provider, providerAccountId])
 }
 
+model Asset {
+  id           String   @id @default(auto()) @map("_id") @db.ObjectId
+  createdAt    DateTime @default(now())
+  description  String
+  initialPrice Float
+  name         String
+  symbol       String   @unique
+  updatedAt    DateTime @updatedAt
+}
+
+model Kline {
+  id        String   @id @default(auto()) @map("_id") @db.ObjectId
+  assetId   String   @db.ObjectId
+  close     Float
+  endTime   DateTime
+  high      Float
+  interval  String
+  low       Float
+  open      Float
+  startTime DateTime
+  volume    Float
+}
+
+model LimitOrder {
+  id        String   @id @default(auto()) @map("_id") @db.ObjectId
+  assetId   String   @db.ObjectId
+  createdAt DateTime @default(now())
+  price     Float
+  qty       Float
+  side      String
+  status    String
+  userId    String   @db.ObjectId
+
+  @@index([status, side, assetId, price, createdAt], map: "matching_index")
+  @@index([assetId, status, qty])
+}
+
+model MatchingAuditLog {
+  id         String   @id @default(auto()) @map("_id") @db.ObjectId
+  executedAt DateTime @default(now())
+  operation  String
+
+  @@index([operation, executedAt])
+}
+
+model MatchingLock {
+  id        String   @id @default(auto()) @map("_id") @db.ObjectId
+  expiresAt DateTime
+
+  @@index([expiresAt])
+}
+
+model PortfolioItem {
+  id      String @id @default(auto()) @map("_id") @db.ObjectId
+  assetId String @db.ObjectId
+  userId  String @db.ObjectId
+
+  @@unique([userId, assetId])
+}
+
 model Session {
   id           String   @id @default(auto()) @map("_id") @db.ObjectId
+  expires      DateTime
   sessionToken String   @unique
   userId       String   @db.ObjectId
-  expires      DateTime
+}
 
-  user User @relation(fields: [userId], references: [id])
+model SystemConfig {
+  id    String @id @default(auto()) @map("_id") @db.ObjectId
+  key   String @unique
+  value String
+}
+
+model Trade {
+  id         String   @id @default(auto()) @map("_id") @db.ObjectId
+  assetId    String   @db.ObjectId
+  executedAt DateTime @default(now())
+  price      Float
+  qty        Float
+  buyerId    String   @db.ObjectId
+  sellerId   String   @db.ObjectId
+
+  @@index([assetId, executedAt])
+}
+
+model User {
+  id             String   @id @default(auto()) @map("_id") @db.ObjectId
+  balance        Float    @default(100000)
+  cashBalance    Float    @default(100000)
+  createdAt      DateTime @default(now())
+  email          String   @unique
+  emailVerified  DateTime?
+  image          String
+  influenceScore Float    @default(0)
+  name           String
 }
 
 model VerificationToken {
@@ -62,115 +126,4 @@ model VerificationToken {
   expires    DateTime
 
   @@unique([identifier, token])
-}
-
-model PortfolioItem {
-  id          String   @id @default(auto()) @map("_id") @db.ObjectId
-  qty         Float
-  avgBuyPrice Float
-
-  userId String @db.ObjectId
-  assetId String @db.ObjectId
-
-  user  User  @relation(fields: [userId], references: [id])
-  asset Asset @relation(fields: [assetId], references: [id])
-
-  // Added: Composite unique constraint for upsert operations
-  @@unique([userId, assetId], name: "userId_assetId")
-}
-
-model Trade {
-  id         String   @id @default(auto()) @map("_id") @db.ObjectId
-  qty        Float
-  price      Float
-  executedAt DateTime @default(now())
-
-  buyerId String @db.ObjectId
-  sellerId String @db.ObjectId
-  assetId String @db.ObjectId
-
-  buyer User @relation("buyer", fields: [buyerId], references: [id])
-  seller User @relation("seller", fields: [sellerId], references: [id])
-  asset Asset @relation(fields: [assetId], references: [id])
-
-  // Added: Index for better query performance
-  @@index([assetId, executedAt])
-}
-
-model LimitOrder {
-  id         String   @id @default(auto()) @map("_id") @db.ObjectId
-  qty        Float
-  price      Float
-  side       String   // "buy" or "sell"
-  status     String   @default("open") // "open", "executed", "cancelled"
-  createdAt  DateTime @default(now())
-  executedAt DateTime?
-
-  userId  String @db.ObjectId
-  assetId String @db.ObjectId
-
-  user  User  @relation(fields: [userId], references: [id])
-  asset Asset @relation(fields: [assetId], references: [id])
-
-  // Added: Composite indexes for matching engine performance
-  @@index([status, side, assetId, price, createdAt], name: "matching_index")
-  @@index([assetId, status, qty])
-}
-
-model Kline {
-  id        String   @id @default(auto()) @map("_id") @db.ObjectId
-  interval  String
-  open      Float
-  close     Float
-  high      Float
-  low       Float
-  volume    Float
-  startTime DateTime
-  endTime   DateTime
-
-  assetId String @db.ObjectId
-  asset   Asset  @relation(fields: [assetId], references: [id])
-}
-
-model Asset {
-  id           String         @id @default(auto()) @map("_id") @db.ObjectId
-  name         String
-  symbol       String         @unique
-  description  String?
-  initialPrice Float?
-  createdAt    DateTime       @default(now())
-  updatedAt    DateTime       @updatedAt
-
-  orders    LimitOrder[]
-  trades    Trade[]
-  klines    Kline[]
-  portfolio PortfolioItem[]
-}
-
-
-model MatchingLock {
-  id         String   @id @map("_id")  
-  acquiredAt DateTime @default(now())
-  expiresAt  DateTime
-}
-
-// Added: System configuration for matching engine settings
-model SystemConfig {
-  id         String   @id @default(auto()) @map("_id") @db.ObjectId
-  key        String   @unique
-  value      String
-  updatedAt  DateTime @updatedAt @default(now())
-}
-
-// Added: Audit log for tracking all matching engine operations
-model MatchingAuditLog {
-  id          String   @id @default(auto()) @map("_id") @db.ObjectId
-  operation   String   // "match_start", "match_complete", "trade_created", etc.
-  assetId     String?  @db.ObjectId
-  orderId     String?  @db.ObjectId
-  tradeId     String?  @db.ObjectId
-  details     Json?    // Store additional context as JSON
-  executedAt  DateTime @default(now())
-
-  @@index([operation, executedAt])
 }

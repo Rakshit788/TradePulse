@@ -1,6 +1,5 @@
 generator client {
   provider = "prisma-client-js"
- 
 }
 
 datasource db {
@@ -25,31 +24,31 @@ model Account {
 
 model Asset {
   id           String   @id @default(auto()) @map("_id") @db.ObjectId
-  createdAt    DateTime @db.Date
+  createdAt    DateTime @default(now())
   description  String
   initialPrice Float
   name         String
   symbol       String   @unique
-  updatedAt    DateTime @db.Date
+  updatedAt    DateTime @updatedAt
 }
 
 model Kline {
   id        String   @id @default(auto()) @map("_id") @db.ObjectId
   assetId   String   @db.ObjectId
   close     Float
-  endTime   DateTime @db.Date
+  endTime   DateTime
   high      Float
   interval  String
   low       Float
   open      Float
-  startTime DateTime @db.Date
+  startTime DateTime
   volume    Float
 }
 
 model LimitOrder {
   id        String   @id @default(auto()) @map("_id") @db.ObjectId
   assetId   String   @db.ObjectId
-  createdAt DateTime @db.Date
+  createdAt DateTime @default(now())
   price     Float
   qty       Float
   side      String
@@ -61,71 +60,72 @@ model LimitOrder {
 }
 
 model MatchingAuditLog {
-  id         String @id @default(auto()) @map("_id") @db.ObjectId
-  /// Field referred in an index, but found no data to define the type.
-  executedAt Json?
-  /// Field referred in an index, but found no data to define the type.
-  operation  Json?
+  id         String   @id @default(auto()) @map("_id") @db.ObjectId
+  executedAt DateTime @default(now())
+  operation  String
 
   @@index([operation, executedAt])
 }
 
 model MatchingLock {
-  id String @id @default(auto()) @map("_id") @db.ObjectId
-}
+  id        String   @id @default(auto()) @map("_id") @db.ObjectId
+  createdAt     DateTime @default(now())
 
+  @@index([createdAt])
+}
 model PortfolioItem {
   id      String @id @default(auto()) @map("_id") @db.ObjectId
-  /// Field referred in an index, but found no data to define the type.
-  assetId Json?
-  /// Field referred in an index, but found no data to define the type.
-  userId  Json?
+  assetId String @db.ObjectId
+  userId  String @db.ObjectId
+
+  qty     Float
 
   @@unique([userId, assetId])
 }
 
+
 model Session {
   id           String   @id @default(auto()) @map("_id") @db.ObjectId
-  expires      DateTime @db.Date
+  expires      DateTime
   sessionToken String   @unique
   userId       String   @db.ObjectId
 }
 
 model SystemConfig {
-  id  String @id @default(auto()) @map("_id") @db.ObjectId
-  /// Field referred in an index, but found no data to define the type.
-  key Json?  @unique
+  id    String @id @default(auto()) @map("_id") @db.ObjectId
+  key   String @unique
+  value String
 }
 
 model Trade {
-  id         String @id @default(auto()) @map("_id") @db.ObjectId
-  /// Field referred in an index, but found no data to define the type.
-  assetId    Json?
-  /// Field referred in an index, but found no data to define the type.
-  executedAt Json?
+  id         String   @id @default(auto()) @map("_id") @db.ObjectId
+  assetId    String   @db.ObjectId
+  executedAt DateTime @default(now())
+  price      Float
+  qty        Float
+  buyerId    String   @db.ObjectId
+  sellerId   String   @db.ObjectId
 
   @@index([assetId, executedAt])
 }
 
 model User {
   id             String   @id @default(auto()) @map("_id") @db.ObjectId
-  balance        Float
-  cashBalance    Float?
-  createdAt      DateTime @db.Date
+  balance        Float    @default(100000)
+  cashBalance    Float    @default(100000)
+  createdAt      DateTime @default(now())
   email          String   @unique
-  /// Could not determine type: the field only had null or empty values in the sample set.
-  emailVerified  Json?
+  emailVerified  DateTime?
   image          String
-  influenceScore Float
+  influenceScore Float    @default(0)
   name           String
 }
 
 model VerificationToken {
-  id         String @id @default(auto()) @map("_id") @db.ObjectId
-  /// Field referred in an index, but found no data to define the type.
-  identifier Json?
-  /// Field referred in an index, but found no data to define the type.
-  token      Json?  @unique
+  id         String   @id @default(auto()) @map("_id") @db.ObjectId
+  identifier String
+  token      String   @unique
+  expires    DateTime
 
   @@unique([identifier, token])
 }
