@@ -47,7 +47,7 @@ export  async  function SendUserPortFolio(data : {userId : string ,  io: Server}
              })
 
 
-             const totalBoughtvalue  =  buytrades.reduce((sum , trade) => sum + (trade.qty + trade.price) , 0) 
+             const totalBoughtvalue  =  buytrades.reduce((sum , trade) => sum + (trade.qty * trade.price) , 0) 
              const totalBoughtQty = buytrades.reduce((sum, trade) => sum + trade.qty, 0);
             const averagePrice = totalBoughtQty > 0 ? totalBoughtvalue / totalBoughtQty : 0;
 
@@ -134,7 +134,7 @@ export async function  getCurrentMarketPrice(assetId : string) : Promise<number>
 
 
  
- export  async function broadcastOrderBook(assetId: string, io: Server) {
+ export  async function broadcastOrderBookAndTrades(assetId: string, io: Server) {
     try {
         const buyOrders = await prisma.limitOrder.findMany({
             where: { assetId, status: 'open', side: 'buy' },
@@ -148,12 +148,19 @@ export async function  getCurrentMarketPrice(assetId : string) : Promise<number>
             take: 20
         });
 
+        const trades  =  await  prisma.trade.findMany({
+            where: {assetId: assetId} , 
+            orderBy : {executedAt : 'desc'} , 
+            take: 20
+        })
+
         io.to(`asset:${assetId}`).emit("orderbook:update", {
             assetId,
             orderBook: {
                 bids: buyOrders,
                 asks: sellOrders
-            }
+            } , 
+            trades: trades
         });
     } catch (error) {
         console.error("Error broadcasting order book:", error);

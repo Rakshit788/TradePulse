@@ -2,7 +2,7 @@ import { Server } from "socket.io";
 import { prisma } from "./client";
 import { matchForAsset } from "./engine/matching";
 import { OrderPlacePayload, OrderCancelPayload , Portfolio} from "./lib/types";
-import { broadcastOrderBook, SendUserPortFolio , getCurrentMarketPrice } from "./lib/helper";
+import { broadcastOrderBookAndTrades, SendUserPortFolio , getCurrentMarketPrice } from "./lib/helper";
 
 
 export function setupSocket(io: Server) {
@@ -60,7 +60,18 @@ export function setupSocket(io: Server) {
                 socket.emit("error", { message: "Error placing order" });
             }
         });
-        
+
+   socket.on("joinAssetRoom", async ({ assetId }) => {
+  socket.join(`asset:${assetId}`);
+  console.log(`User joined asset room: asset:${assetId}`);
+
+  try {
+    await broadcastOrderBookAndTrades(assetId, io);
+  } catch (error) {
+    console.error("Failed to send initial orderbook and trades:", error);
+  }
+});
+
 
        
 
