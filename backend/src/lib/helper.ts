@@ -1,7 +1,7 @@
 import { prisma } from "../client";
 import { Server } from "socket.io";
 import { Portfolio } from "./types";
-import { it } from "node:test";
+import { FirsttimeReward } from "./types";
 
 
 
@@ -165,6 +165,67 @@ export async function  getCurrentMarketPrice(assetId : string) : Promise<number>
     } catch (error) {
         console.error("Error broadcasting order book:", error);
     }
+}
+
+
+
+
+export async function firsttimeFunction(data: FirsttimeReward[], userId: string) {
+  try {
+    const user = await prisma.user.findUnique({ where: { id: userId } });
+
+    if (!user) {
+      console.error(" User not found:", userId);
+      return;
+    }
+
+    if (user.claimedStarterPack) {
+      console.warn("⚠️ User has already claimed the starter pack");
+      return;
+    }
+
+    const totalQty = data.reduce((sum, item) => sum + item.qty, 0);
+    if (totalQty !== 100) {
+      console.error(" Total quantity must be exactly 100. Provided:", totalQty);
+      return;
+    }
+
+    for (const reward of data) {
+      const { assetId, qty } = reward;
+
+      const asset = await prisma.asset.findUnique({ where: { id: assetId } });
+      if (!asset) {
+        console.error(" Asset not found:", assetId);
+        continue;
+      }
+
+      const existingItem = await prisma.portfolioItem.findUnique({
+        where: { userId_assetId: { userId, assetId } },
+      });
+
+      if (existingItem) {
+        await prisma.portfolioItem.update({
+          where: { userId_assetId: { userId, assetId } },
+          data: { qty: existingItem.qty + qty },
+        });
+      } else {
+        await prisma.portfolioItem.create({
+          data: { userId, assetId, qty },
+        });
+      }
+    }
+
+    
+    await prisma.user.update({
+      where: { id: userId },
+      data: { claimedStarterPack: true },
+    });
+
+    console.log("Starter pack successfully claimed!");
+
+  } catch (error) {
+    console.error(" Error processing first time function:", error);
+  }
 }
 
 

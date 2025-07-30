@@ -29,3 +29,9 @@ export type Portfolio = {
     }>;
     totalValue: number;
 };
+
+
+export type FirsttimeReward = {
+    assetId: string;
+    qty: number;
+}

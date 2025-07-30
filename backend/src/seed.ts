@@ -1,32 +1,51 @@
-// seed.ts
-import { prisma } from './client';
+import { prisma } from "./client";
 
-async function seed() {
-  const assetId = "6877f767b58a05469553e4e0";
-  const users = [
-    { id: "68781b407b8f7617f3d18842", quantity: 1000 },
-    { id: "687f5ba37d365cd716656c83", quantity: 0 },
+async function main() {
+  const assets = [
+    {
+      name: "Bitcoin",
+      symbol: "BTC",
+      description: "Digital gold and the first cryptocurrency.",
+      initialPrice: 60000,
+    },
+    {
+      name: "Ethereum",
+      symbol: "ETH",
+      description: "Smart contract platform for decentralized apps.",
+      initialPrice: 4000,
+    },
+    {
+      name: "Solana",
+      symbol: "SOL",
+      description: "High-performance blockchain supporting fast transactions.",
+      initialPrice: 150,
+    },
+    {
+      name: "Cardano",
+      symbol: "ADA",
+      description: "Proof-of-stake blockchain for smart contracts.",
+      initialPrice: 2.5,
+    },
+    {
+      name: "Polkadot",
+      symbol: "DOT",
+      description: "Multichain network connecting various blockchains.",
+      initialPrice: 35,
+    },
   ];
 
-  for (const user of users) {
-    await prisma.portfolioItem.upsert({
-      where: {
-        userId_assetId: {
-          userId: user.id,
-          assetId,
-        },
-      },
-      update: {},
-      create: {
-        userId: user.id,
-        assetId,
-        qty: user.quantity,
-      },
-    });
+  for (const asset of assets) {
+    await prisma.asset.create({ data: asset });
   }
 
-  console.log("Seeded test portfolios");
-  process.exit(0);
+  console.log("Seeded assets successfully");
 }
 
-seed();
+main()
+  .catch((e) => {
+    console.error(" Error seeding assets:", e);
+    process.exit(1);
+  })
+  .finally(async () => {
+    await prisma.$disconnect();
+  });

@@ -17,7 +17,7 @@ model User {
   cashBalance    Float     @default(100000)
   influenceScore Float     @default(0)
   createdAt      DateTime  @default(now())
-
+  claimedStarterPack Boolean @default(false)
   accounts       Account[]
   sessions       Session[]
 }
