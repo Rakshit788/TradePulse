@@ -6,11 +6,14 @@ export async function matchForAsset(assetId: string) {
             where: { status: "open", side: "buy", assetId },
             orderBy: [{ price: "desc" }, { createdAt: "asc" }],
         });
-
+         console.log(`buy orders for ${assetId}`, buyOrders);
+         
         const sellOrders = await prisma.limitOrder.findMany({
             where: { status: "open", side: "sell", assetId },
             orderBy: [{ price: "asc" }, { createdAt: "asc" }],
         });
+        console.log(`sell orders for ${assetId}`, sellOrders);
+
 
         let trades = [];
 
@@ -20,6 +23,9 @@ export async function matchForAsset(assetId: string) {
                     if (buy.userId === sell.userId) {
                         continue;
                     }
+
+                    console.log(`Matching buy order ${buy.id} with sell order ${sell.id}`);
+                    
 
                     const qty = Math.min(buy.qty, sell.qty);
                     const tradePrice = sell.price;
@@ -33,6 +39,8 @@ export async function matchForAsset(assetId: string) {
                             where: { userId_assetId: { userId: sell.userId, assetId } },
                         }),
                     ]);
+                    console.log(`Buyer: ${buyer?.id}, Seller: ${seller?.id}, Portfolio: ${sellerPortfolio?.qty}`);
+
 
                     if (!buyer || !seller || !sellerPortfolio || sellerPortfolio.qty < qty) {
                         console.error("Buyer, seller, or seller's portfolio invalid");
@@ -43,8 +51,9 @@ export async function matchForAsset(assetId: string) {
                         console.error("Buyer has insufficient funds");
                         continue;
                     }
+                    console.log(`Executing trade for ${qty} units at ${tradePrice} each`);
 
-                    // Atomic transaction using tx
+                    
                     await prisma.$transaction(async (tx) => {
                         const trade = await tx.trade.create({
                             data: {
@@ -55,6 +64,8 @@ export async function matchForAsset(assetId: string) {
                                 assetId,
                             },
                         });
+                        console.log(`Trade created: ${trade}`);
+
                         trades.push(trade);
 
                         await tx.limitOrder.update({
@@ -65,6 +76,7 @@ export async function matchForAsset(assetId: string) {
                             },
                         });
 
+                        
                         await tx.limitOrder.update({
                             where: { id: sell.id },
                             data: {
@@ -92,12 +104,15 @@ export async function matchForAsset(assetId: string) {
                             create: { userId: buyer.id, assetId, qty },
                             update: { qty: { increment: qty } },
                         });
+                        console.log(`Portfolio updated for buyer ${buyer.id} with qty ${qty}`);
+                        
 
                         await tx.portfolioItem.update({
                             where: { userId_assetId: { userId: seller.id, assetId } },
                             data: { qty: { decrement: qty } },
                         });
                     });
+                    console.log(`Trade executed for ${qty} units at ${tradePrice} each`);
 
                 }
             }

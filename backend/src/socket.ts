@@ -3,6 +3,7 @@ import { prisma } from "./client";
 import { matchForAsset } from "./engine/matching";
 import { OrderPlacePayload, OrderCancelPayload , Portfolio} from "./lib/types";
 import { broadcastOrderBookAndTrades, SendUserPortFolio , getCurrentMarketPrice } from "./lib/helper";
+import { log } from "console";
 
 
 export function setupSocket(io: Server) {
@@ -19,12 +20,11 @@ export function setupSocket(io: Server) {
         })
 
         socket.on("place:orders", async (data: OrderPlacePayload) => {
-            const { userId, assetId, qty, price, side, status } = data;
-            if (!userId || !assetId || qty <= 0 || price <= 0 || !side || !["open", "filled", "cancelled"].includes(status)) {
-                console.error(" Invalid order data", data);
-                socket.emit("error", { message: "Invalid order data" });
-                return;
-            }
+            let parsed  : OrderPlacePayload 
+            parsed =  JSON.parse(data as any)
+            const { userId, assetId, qty, price, side, status } = parsed;
+            console.log("Place order request received", data);
+           
 
             try {
                 const user = await prisma.user.findUnique({ where: { id: userId } });
