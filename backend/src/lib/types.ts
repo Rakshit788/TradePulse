@@ -35,3 +35,8 @@ export type FirsttimeReward = {
     assetId: string;
     qty: number;
 }
+
+
+export type assetIdReq = {
+    assetId : string
+}

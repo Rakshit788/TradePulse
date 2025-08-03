@@ -98,42 +98,68 @@ export  async  function SendUserPortFolio(data : {userId : string ,  io: Server}
 
 
 
-export async function  getCurrentMarketPrice(assetId : string) : Promise<number>{
-   
+
+export async function getCurrentMarketPrice(assetId: string, io?: Server): Promise<number> {
   try {
-      const latesttrade  =  await prisma.trade.findFirst({
-          where : {assetId : assetId} ,
-          orderBy : {executedAt : "desc"}
-      })
-  
-        if (latesttrade) {
-              return latesttrade.price;
-          }
-  
-            const latestOrder = await prisma.limitOrder.findFirst({
-              where: { assetId, status: 'open' },
-              orderBy: { createdAt: 'desc' }
-          });
-  
-          if (latestOrder) {
-              return latestOrder.price;
-          }
-  
-          // Fallback to asset initial price
-          const asset = await prisma.asset.findUnique({ where: { id: assetId } });
-         if(asset)  return asset?.initialPrice 
+    // 1. Last trade price
+    const latestTrade = await prisma.trade.findFirst({
+      where: { assetId },
+      orderBy: { executedAt: "desc" },
+    });
 
-         return 0 ;
+    if (latestTrade) {
+      io?.to(`asset:${assetId}`).emit("price:update", {
+        assetId,
+        price: latestTrade.price,
+        source: "trade",
+      });
+      return latestTrade.price;
+    }
 
-        
-  
-  
+    // 2. Mid-price from best bid and best ask
+    const [bestBid, bestAsk] = await Promise.all([
+      prisma.limitOrder.findFirst({
+        where: { assetId, side: "buy", status: "open" },
+        orderBy: { price: "desc" },
+      }),
+      prisma.limitOrder.findFirst({
+        where: { assetId, side: "sell", status: "open" },
+        orderBy: { price: "asc" },
+      }),
+    ]);
+
+    const bestBidprice = bestBid?.price ?? 0;
+    const bestaskprice = bestAsk?.price ?? 0;
+
+    if (bestBidprice > 0 && bestaskprice > 0) {
+      const actualprice = (bestBidprice + bestaskprice) / 2;
+      io?.to(`asset:${assetId}`).emit("price:update", {
+        assetId,
+        price: actualprice,
+        source: "orderbook",
+      });
+      return actualprice;
+    }
+
+    // 3. Initial fallback
+    const asset = await prisma.asset.findUnique({ where: { id: assetId } });
+
+    if (asset) {
+      io?.to(`asset:${assetId}`).emit("price:update", {
+        assetId,
+        price: asset.initialPrice,
+        source: "initial",
+      });
+      return asset.initialPrice;
+    }
+
+    return 0;
   } catch (error) {
-    console.log("error of getting asset value" ,  error ) 
-    return 0 ; 
+    console.error("Error fetching market price:", error);
+    return 0;
   }
-
 }
+
 
 
  

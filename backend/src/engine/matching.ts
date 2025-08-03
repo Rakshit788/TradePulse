@@ -47,7 +47,7 @@ export async function matchForAsset(assetId: string) {
                         continue;
                     }
 
-                    if ((buyer.cashBalance ?? buyer.balance) < totalCost) {
+                    if ((buyer.cashBalance ) < totalCost) {
                         console.error("Buyer has insufficient funds");
                         continue;
                     }
@@ -88,14 +88,14 @@ export async function matchForAsset(assetId: string) {
                         await tx.user.update({
                             where: { id: buyer.id },
                             data: {
-                                cashBalance: (buyer.cashBalance ?? buyer.balance) - totalCost,
+                                cashBalance: (buyer.cashBalance ) - totalCost,
                             },
                         });
 
                         await tx.user.update({
                             where: { id: seller.id },
                             data: {
-                                cashBalance: (seller.cashBalance ?? seller.balance) + totalCost,
+                                cashBalance: (seller.cashBalance ) + totalCost,
                             },
                         });
 
