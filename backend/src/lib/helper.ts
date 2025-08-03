@@ -1,7 +1,10 @@
 import { prisma } from "../client";
 import { Server } from "socket.io";
 import { Portfolio } from "./types";
+import { startOfMinute, subMinutes } from "date-fns";
 import { FirsttimeReward } from "./types";
+
+
 
 
 
@@ -154,6 +157,7 @@ export async function  getCurrentMarketPrice(assetId : string) : Promise<number>
             take: 20
         })
 
+
         io.to(`asset:${assetId}`).emit("orderbook:update", {
             assetId,
             orderBook: {
@@ -168,9 +172,90 @@ export async function  getCurrentMarketPrice(assetId : string) : Promise<number>
 }
 
 
+export async function KlineGenerator(assetId: string, io: Server, timestamp: Date) {
+  const asset = await prisma.asset.findUnique({
+    where: { id: assetId },
+  });
+
+  if (!asset) {
+    console.error("Asset not found:", assetId);
+    return;
+  }
+
+  
+  const interval = "1h";
+  const endtime = startOfMinute(timestamp);
+  const startTime = subMinutes(endtime, 60);
+
+  const trades = await prisma.trade.findMany({
+    where: {
+      assetId: assetId,
+      executedAt: { gte: startTime, lt: endtime },
+    },
+    orderBy: { executedAt: "asc" },
+  });
+
+  if (trades.length === 0) {
+    console.warn("No trades found for asset:", assetId);
+    return;
+  }
+
+  const prices = trades.map(t => t.price);
+  const low = Math.min(...prices);
+  const high = Math.max(...prices);
+  const open = trades[0].price;
+  const close = trades[trades.length - 1].price;
+  const volume = trades.reduce((sum, t) => sum + t.qty, 0);
+
+  await prisma.kline.upsert({
+    where: {
+      assetId_interval_startTime: {
+        assetId: assetId,
+        interval: interval,
+        startTime: startTime,
+      },
+    },
+    update: {
+      open,
+      close,
+      high,
+      low,
+      volume,
+      endTime: endtime,
+    },
+    create: {
+      assetId: assetId,
+      interval: interval,
+      startTime: startTime,
+      endTime: endtime,
+      open,
+      close,
+      high,
+      low,
+      volume,
+    },
+  });
+
+  io.to(`asset:${assetId}`).emit("kline:update", {
+    assetId,
+    interval,
+    startTime,
+    endtime,
+    open,
+    close,
+    high,
+    low,
+    volume,
+  });
+
+  console.log(` Kline generated for ${assetId} at ${startTime.toISOString()}`);
+}
 
 
-export async function firsttimeFunction(data: FirsttimeReward[], userId: string) {
+
+
+
+export async function  firsttimeTreward(data: FirsttimeReward[], userId: string) {
   try {
     const user = await prisma.user.findUnique({ where: { id: userId } });
 
@@ -180,7 +265,7 @@ export async function firsttimeFunction(data: FirsttimeReward[], userId: string)
     }
 
     if (user.claimedStarterPack) {
-      console.warn("⚠️ User has already claimed the starter pack");
+      console.warn(" User has already claimed the starter pack");
       return;
     }
 
@@ -227,6 +312,9 @@ export async function firsttimeFunction(data: FirsttimeReward[], userId: string)
     console.error(" Error processing first time function:", error);
   }
 }
+
+
+
 
 
 
